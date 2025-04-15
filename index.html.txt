@@ -1,0 +1,111 @@
+<!DOCTYPE html><html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulado Pessoal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+    .question { margin-bottom: 10px; }
+    .options button { margin: 2px; }
+    .selected { background-color: #add8e6; }
+    #result { margin-top: 20px; font-weight: bold; }
+    #timer { font-size: 20px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Simulado Pessoal</h1><label>1. Envie o PDF do gabarito (ex: "01 A\n02 B\n..."):</label><br> <input type="file" id="pdfInput" accept="application/pdf"><br><br>
+
+<button onclick="startTimer()">Iniciar Cronômetro</button> <button onclick="stopTimer()">Parar</button>
+
+  <div id="timer">00:00</div><br>  <div id="questions"></div>
+  <button onclick="corrigir()">Corrigir</button>  <div id="result"></div>  <script>
+    let respostas = Array(90).fill(null);
+    let gabarito = [];
+    let tempo = 0;
+    let cronometro = null;
+
+    function startTimer() {
+      tempo = 0;
+      clearInterval(cronometro);
+      cronometro = setInterval(() => {
+        tempo++;
+        let minutos = String(Math.floor(tempo / 60)).padStart(2, '0');
+        let segundos = String(tempo % 60).padStart(2, '0');
+        document.getElementById("timer").innerText = `${minutos}:${segundos}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(cronometro);
+    }
+
+    function gerarQuestoes() {
+      const container = document.getElementById("questions");
+      for (let i = 0; i < 90; i++) {
+        const div = document.createElement("div");
+        div.className = "question";
+        div.innerHTML = `<strong>Questão ${i + 1}:</strong> `;
+        const botoes = document.createElement("div");
+        botoes.className = "options";
+        ['A', 'B', 'C', 'D', 'E'].forEach(letra => {
+          const btn = document.createElement("button");
+          btn.innerText = letra;
+          btn.onclick = () => {
+            respostas[i] = letra;
+            [...botoes.children].forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+          };
+          botoes.appendChild(btn);
+        });
+        div.appendChild(botoes);
+        container.appendChild(div);
+      }
+    }
+
+    async function corrigir() {
+      if (gabarito.length !== 90) {
+        alert("Gabarito incompleto ou inválido. Verifique o PDF enviado.");
+        return;
+      }
+      let acertos = 0;
+      let erros = [];
+      for (let i = 0; i < 90; i++) {
+        if (respostas[i] === gabarito[i]) acertos++;
+        else erros.push(`Questão ${i + 1}: você marcou ${respostas[i] || 'nenhuma'} — o correto era ${gabarito[i]}`);
+      }
+      let resultado = `Você acertou ${acertos} de 90 questões.\n\n`;
+      if (erros.length > 0) {
+        resultado += "Erros:\n" + erros.join("\n");
+      }
+      document.getElementById("result").innerText = resultado;
+    }
+
+    document.getElementById('pdfInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 0; i < pdf.numPages; i++) {
+        const page = await pdf.getPage(i + 1);
+        const text = await page.getTextContent();
+        fullText += text.items.map(item => item.str).join(" ") + " ";
+      }
+      const matches = fullText.match(/(\d{1,2})[\.\s\-:]*([A-E])/g);
+      if (!matches) {
+        alert("Não foi possível extrair o gabarito do PDF. Verifique o formato.");
+        return;
+      }
+      gabarito = Array(90).fill(null);
+      matches.forEach(match => {
+        const [_, numStr, letra] = match.match(/(\d{1,2})[\.\s\-:]*([A-E])/) || [];
+        const index = parseInt(numStr) - 1;
+        if (index >= 0 && index < 90) gabarito[index] = letra;
+      });
+      alert("Gabarito carregado com sucesso!");
+    });
+
+    gerarQuestoes();
+  </script></body>
+</html>
